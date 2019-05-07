@@ -5,10 +5,10 @@ import time
 
 from PySide2.QtCore import Qt, Slot
 from PySide2.QtWidgets import (QApplication, QGridLayout,
-    QTableWidget, QTableWidgetItem, QAbstractItemView, QWidget, QPushButton, QLineEdit, QHBoxLayout)
+    QTableWidget, QTableWidgetItem, QAbstractItemView, QWidget, QPushButton, QLineEdit, QHBoxLayout, QLabel)
 
 import Trine2Connection
-    
+
 class ServerBrowser(QWidget):
     def __init__(self):
         QWidget.__init__(self)
@@ -19,55 +19,44 @@ class ServerBrowser(QWidget):
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        # create refresh button
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.clicked.connect(self.search_public)
+        self.table_widget.setSortingEnabled(True)
 
         # password field
-        self.search_edit = QLineEdit("Password...")
+        self.search_label = QLabel("Password:")
+        # password field
+        self.search_edit = QLineEdit()
+        self.search_edit.setMaxLength(16)
         # search button
-        self.search_button = QPushButton("Search")
-        self.search_button.clicked.connect(self.search_password)
+        self.search_button = QPushButton("Refresh")
+        self.search_button.clicked.connect(self.search)
 
         # search form
         self.search_form = QHBoxLayout()
+        self.search_form.addWidget(self.search_label)
         self.search_form.addWidget(self.search_edit)
-        self.search_form.addWidget(self.search_button)
 
         # create main layout
         self.main_layout = QGridLayout()
         self.main_layout.addWidget(self.table_widget, 0, 0)
-        self.main_layout.addWidget(self.refresh_button, 1, 0)
-        self.main_layout.addLayout(self.search_form,2,0)
+        self.main_layout.addLayout(self.search_form,1,0)
+        self.main_layout.addWidget(self.search_button, 2, 0)
         self.setLayout(self.main_layout)
 
         # should connect to trine server here but the conection is pretty short lived
         # TODO: unless we continuously send heartbeats
         #self.tr2_connection = Trine2Connection.Trine2Connection()
-        
-        
+
+
     @Slot()
-    def search_public(self):
-        self.refresh_button.setEnabled(False)
-
-        self.tr2_connection = Trine2Connection.Trine2Connection()
-        games = self.tr2_connection.search_public()
-        self.update(games)
-
-        self.refresh_button.setEnabled(True)
-
-    
-    @Slot()
-    def search_password(self):
-        self.refresh_button.setEnabled(False)
+    def search(self):
+        self.search_button.setEnabled(False)
 
         self.tr2_connection = Trine2Connection.Trine2Connection()
         password = self.search_edit.text()
         games = self.tr2_connection.search(password)
         self.update(games)
 
-        self.refresh_button.setEnabled(True)
+        self.search_button.setEnabled(True)
 
 
     def update(self, games):
@@ -76,7 +65,10 @@ class ServerBrowser(QWidget):
         '''
         # clean up
         self.table_widget.clearContents()
-        
+
+        # disable sorting while inserting is necessary
+        self.table_widget.setSortingEnabled(False)
+
         # build data array
         # elements are rows
         input_data = []
@@ -102,6 +94,10 @@ class ServerBrowser(QWidget):
             # then over fields in row
             for j in range(len(input_data[i])):
                 self.table_widget.setItem(i, j, QTableWidgetItem(input_data[i][j]))
+
+        # re-enable sorting once we're done inserting items
+        self.table_widget.setSortingEnabled(True)
+
 
 
 if __name__ == "__main__":
