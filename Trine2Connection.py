@@ -28,35 +28,25 @@ class Trine2Connection:
         self.__cookie = message[4:]
 
 
-    def search(self, password):
+    def search(self, password=""):
         '''
         Search for all games protected by the given password string.
 
         The password parameter is expected to be a string of length <= 16.
+        No password or empty password returns all public games.
         '''
-        # convert to hex and enforce length of 16 bytes
-        # cut if to long, pad with zeros if to short
-        password = password.encode("utf-8").hex()[:32].ljust(32, "0")
+        if password != "":
+            # convert to hex and enforce length of 16 bytes
+            # cut if to long, pad with zeros if to short
+            password_bytes = password.encode("utf-8").hex()[:32].ljust(32, "0")
+        else:
+            password_bytes = "0"*32
+
         request_id = os.urandom(4).hex()
-        # payload form: type[1] + cookie[4] + 03 + requestid[4] + 00000001 + password + padding
-        get_games_payload = bytes.fromhex("e0" + self.__cookie + "03" + request_id + "00000001" + password)
+        # payload form: type[1] + cookie[4] + 03 + requestid[4] + 000000 + {notfull=01|full=02|all=03} + password + padding
+        get_games_payload = bytes.fromhex("e0" + self.__cookie + "03" + request_id + "000000" "03" + password_bytes)
 
         self.__sock.sendto(get_games_payload, self.__server)
-        message, _ = self.__sock.recvfrom(4096)
-
-        return self.__parse_games_message(message, request_id)
-
-
-    def search_public(self):
-        '''
-        Get a list of all public games.
-        '''
-        # TODO: randomize
-        request_id = os.urandom(4).hex()
-        # payload form: type[1] + cookie[4] + 03 + requestid[4] + 000000 + {notfull=01|full=02|all=03} + padding
-        get_list_payload = bytes.fromhex("e0" + self.__cookie + "03" + request_id + "000000" + "03" + "00000000000000000000000000000000")
-
-        self.__sock.sendto(get_list_payload, self.__server)
         message, _ = self.__sock.recvfrom(4096)
 
         return self.__parse_games_message(message, request_id)
@@ -103,4 +93,3 @@ class Trine2Connection:
             game = {"id": id, "name": name, "level": level, "difficulty": difficulty, "num_players": num_players, "max_players": max_players, "mode": mode}
             games.append(game)
         return games
-        
