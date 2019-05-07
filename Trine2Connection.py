@@ -103,3 +103,4 @@ class Trine2Connection:
             game = {"id": id, "name": name, "level": level, "difficulty": difficulty, "num_players": num_players, "max_players": max_players, "mode": mode}
             games.append(game)
         return games
+        
