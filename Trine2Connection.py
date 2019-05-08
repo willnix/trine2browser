@@ -61,41 +61,39 @@ class Trine2Connection:
         if len(game_id) != 8:
             return
 
-        request_id = os.urandom(4).hex()
-        request_id2 = os.urandom(4).hex()
+        request_id = os.urandom(4)
+        request_id2 = os.urandom(4)
 
+        # payload format is:
         #    cookie   game_id  (fix?)   req_id            req_id2
         # e4 ca865408 cdb31383 95e99f2f 6aa4c0a8 2a516aa4 80a60deb 000000010110000100a3f5cc
-        payload_str = "e4" + self.__cookie + game_id + self.local_ip + request_id + "2a516aa4" + request_id2 + "000000010110000100a3f5cc"
-        get_ip_payload = bytes.fromhex(payload_str)
+        get_ip_payload = bytes.fromhex("e4" + self.__cookie + game_id + self.local_ip + request_id.hex() + "2a516aa4" + request_id2.hex() + "000000010110000100a3f5cc")
 
         self.__sock.sendto(get_ip_payload, self.__server)
         message1, _ = self.__sock.recvfrom(4096)
         message2, _ = self.__sock.recvfrom(4096)
-        message1 = message1.hex()
-        message2 = message2.hex()
 
         # message1 format is:
         #    game_id  cookie            resp_id  req_id2
         # d1 08f29c44 9771226b 00000000 da522874 02e4648a
 
         # check request_id2 and grab resp_id
-        if request_id2 != message1[34:42]:
+        if request_id2 != message1[17:21]:
             return
-        response_id = message1[26:34]
+        response_id = message1[13:17]
 
         # message2 format is:
         #    game_id  cookie   srv_ip   (???)    req_id  resp_id
         # e4 08f29c44 9771226b 95e99f2f 6aa4c0a8 2a516aa4 da522874 00000003 0110000100a3f5cc
 
         # log for analysis
-        print("game_id = %s and game_fix = %s" % (game_id, message2[26:34]))
-        print("request_id = %s and message[34:42] = %s" % (request_id, message2[34:42]))
+        print("game_id = %s and game_fix = %s" % (game_id, message2[13:17].hex()))
+        print("request_id = %s and message[34:42] = %s" % (request_id.hex(), message2[17:21].hex()))
 
         # check response_id and grab ip
-        if response_id != message2[42:50]:
+        if response_id != message2[21:25]:
             return
-        ip = ipaddress.IPv4Address(bytes.fromhex(message2[18:26]))
+        ip = ipaddress.IPv4Address(message2[9:13])
         return str(ip)
 
 
