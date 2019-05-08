@@ -2,11 +2,14 @@
 import sys
 import socket
 import os
+import ipaddress
+from requests import get
 
 class Trine2Connection:
     __server = ("185.20.138.174", 27300)
 
     def __init__(self):
+        self.local_ip = ipaddress.IPv4Address(get('https://api.ipify.org').text).packed.hex()
         self.__connect()
 
     def __connect(self):
@@ -51,6 +54,52 @@ class Trine2Connection:
 
         return self.__parse_games_message(message, request_id)
 
+    def getGameIP(self, game_id):
+        '''
+        Returns the IP of game with ID.
+        '''
+        if len(game_id) != 8:
+            return
+
+        request_id = os.urandom(4).hex()
+        request_id2 = os.urandom(4).hex()
+
+        #    cookie   game_id  (fix?)   req_id            req_id2
+        # e4 ca865408 cdb31383 95e99f2f 6aa4c0a8 2a516aa4 80a60deb 000000010110000100a3f5cc
+        payload_str = "e4" + self.__cookie + game_id + self.local_ip + request_id + "2a516aa4" + request_id2 + "000000010110000100a3f5cc"
+        get_ip_payload = bytes.fromhex(payload_str)
+
+        self.__sock.sendto(get_ip_payload, self.__server)
+        message1, _ = self.__sock.recvfrom(4096)
+        message2, _ = self.__sock.recvfrom(4096)
+        message1 = message1.hex()
+        message2 = message2.hex()
+
+        # message1 format is:
+        #    game_id  cookie            resp_id  req_id2
+        # d1 08f29c44 9771226b 00000000 da522874 02e4648a
+
+        # check request_id2 and grab resp_id
+        if request_id2 != message1[34:42]:
+            return
+        response_id = message1[26:34]
+
+        # message2 format is:
+        #    game_id  cookie   srv_ip   (???)    req_id  resp_id
+        # e4 08f29c44 9771226b 95e99f2f 6aa4c0a8 2a516aa4 da522874 00000003 0110000100a3f5cc
+
+        # log for analysis
+        print("game_id = %s and game_fix = %s" % (game_id, message2[26:34]))
+        print("request_id = %s and message[34:42] = %s" % (request_id, message2[34:42]))
+
+        # check response_id and grab ip
+        if response_id != message2[42:50]:
+            return
+        ip = ipaddress.IPv4Address(bytes.fromhex(message2[18:26]))
+        return str(ip)
+
+
+
     def __parse_games_message(self, message, request_id):
         # check if the response has the correct message type and request_id
         if not message[:5].hex() == ("da" + request_id):
@@ -77,7 +126,7 @@ class Trine2Connection:
             # cut off at first nullbyte
             end = message.find(b"\x00",offset+15)
             name = message[offset+15:end].decode("utf-8")
-            id = message[offset:offset+4].hex()
+            game_id = message[offset:offset+4].hex()
 
             mode_map = ["Classic","Unlimited"]
             mode = mode_map[int(message[offset+8])]
@@ -90,6 +139,9 @@ class Trine2Connection:
             num_players = int(message[offset+11])
             max_players = int(message[offset+12])
 
-            game = {"id": id, "name": name, "level": level, "difficulty": difficulty, "num_players": num_players, "max_players": max_players, "mode": mode}
+            # get game ip
+            ip = self.getGameIP(game_id)
+
+            game = {"id": game_id, "name": name, "level": level, "difficulty": difficulty, "num_players": num_players, "max_players": max_players, "mode": mode, "ip": ip}
             games.append(game)
         return games

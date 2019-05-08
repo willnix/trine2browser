@@ -14,12 +14,14 @@ class ServerBrowser(QWidget):
         QWidget.__init__(self)
 
         # create table
-        self.table_widget = QTableWidget(0, 6)
-        self.table_widget.setHorizontalHeaderLabels(["ID","Name","Level","Difficulty","Mode","Players"])
+        self.table_widget = QTableWidget(0, 7)
+        self.table_widget.setHorizontalHeaderLabels(["ID","Name","Level","Difficulty","Mode","Players", "IP"])
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_widget.setSortingEnabled(True)
+        # adjust width of IP column
+        self.table_widget.setColumnWidth(6,170)
 
         # password field
         self.search_label = QLabel("Password:")
@@ -82,6 +84,7 @@ class ServerBrowser(QWidget):
                 game["difficulty"],
                 game["mode"],
                 "%d/%d" % (game["num_players"], game["max_players"]),
+                game["ip"]
             ]
             input_data.append(game_line)
 
